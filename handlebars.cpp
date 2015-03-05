@@ -25,6 +25,7 @@
 extern "C" {
     #include "handlebars.tab.h"
     #include "handlebars.lex.h"
+    int handlebars_yy_parse (struct handlebars_context * context);
 }
 
 namespace HPHP {

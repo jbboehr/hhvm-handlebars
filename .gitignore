@@ -1,6 +1,8 @@
+*~
 .cproject
 .project
 .settings
+run-test
 /CMake*
 /cmake_install.cmake
 /handlebars.so
