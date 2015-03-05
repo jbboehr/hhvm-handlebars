@@ -28,12 +28,23 @@ extern "C" {
     int handlebars_yy_parse (struct handlebars_context * context);
 }
 
+#define HBS_STR(x) #x
+#define HBS_HHVM_CONST_INT(x) HPHP::Native::registerConstant<KindOfInt64>(StaticString(HBS_STR(x)).get(), x);
+
 namespace HPHP {
 
 
 namespace {
 
 static std::string handlebars_last_error;
+static const int64_t HANDLEBARS_COMPILER_FLAG_NONE = handlebars_compiler_flag_none;
+static const int64_t HANDLEBARS_COMPILER_FLAG_USE_DEPTHS = handlebars_compiler_flag_use_depths;
+static const int64_t HANDLEBARS_COMPILER_FLAG_STRING_PARAMS = handlebars_compiler_flag_string_params;
+static const int64_t HANDLEBARS_COMPILER_FLAG_TRACK_IDS = handlebars_compiler_flag_track_ids;
+static const int64_t HANDLEBARS_COMPILER_FLAG_KNOWN_HELPERS_ONLY = handlebars_compiler_flag_known_helpers_only;
+static const int64_t HANDLEBARS_COMPILER_FLAG_COMPAT = handlebars_compiler_flag_compat;
+static const int64_t HANDLEBARS_COMPILER_FLAG_ALL = handlebars_compiler_flag_all;
+
 static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node);
 
 static char ** hhvm_handlebars_known_helpers_from_variant(struct handlebars_context * ctx, const Variant & knownHelpers) {
@@ -570,6 +581,16 @@ static class HandlebarsExtension : public Extension {
     HandlebarsExtension() : Extension("handlebars") {}
 
     virtual void moduleInit() {
+#ifndef ECLIPSE
+    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_NONE);
+    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_USE_DEPTHS);
+    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_STRING_PARAMS);
+    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_TRACK_IDS);
+    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_KNOWN_HELPERS_ONLY);
+    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_COMPAT);
+    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_ALL);
+#endif
+
         HHVM_FE(handlebars_error);
         HHVM_FE(handlebars_lex);
         HHVM_FE(handlebars_lex_print);
