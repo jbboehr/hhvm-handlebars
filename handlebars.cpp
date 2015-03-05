@@ -23,8 +23,8 @@
 #include "handlebars_token_printer.h"
 
 extern "C" {
-	#include "handlebars.tab.h"
-	#include "handlebars.lex.h"
+    #include "handlebars.tab.h"
+    #include "handlebars.lex.h"
 }
 
 namespace HPHP {
@@ -37,9 +37,9 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
 
 static char ** hhvm_handlebars_known_helpers_from_variant(struct handlebars_context * ctx, const Variant & knownHelpers) {
     if( !knownHelpers.isArray() ) {
-    	return NULL;
+        return NULL;
     }
-	Array knownHelpersArray = knownHelpers.toArray();
+    Array knownHelpersArray = knownHelpers.toArray();
 
     long count = knownHelpersArray.length();
 
@@ -52,12 +52,12 @@ static char ** hhvm_handlebars_known_helpers_from_variant(struct handlebars_cont
     ptr = known_helpers = talloc_array(ctx, char *, count + 1);
 
     // Copy in known helpers
-	for (ArrayIter iter(knownHelpersArray); iter; ++iter) {
-	  	const Variant& value(iter.secondRefPlus());
-	  	if( value.isString() ) {
-	  		*ptr++ = (char *) talloc_strdup(ctx, value.toCStrRef().toCppString().c_str());
-	  	}
-	}
+    for (ArrayIter iter(knownHelpersArray); iter; ++iter) {
+          const Variant& value(iter.secondRefPlus());
+          if( value.isString() ) {
+              *ptr++ = (char *) talloc_strdup(ctx, value.toCStrRef().toCppString().c_str());
+          }
+    }
 
     // Copy in builtins
     for( const char ** ptr2 = handlebars_builtins; *ptr2; ++ptr2 ) {
@@ -67,28 +67,28 @@ static char ** hhvm_handlebars_known_helpers_from_variant(struct handlebars_cont
     // Null terminate
     *ptr++ = NULL;
 
-	return known_helpers;
+    return known_helpers;
 }
 
 static void hhvm_handlebars_operand_array_append(struct handlebars_operand * operand, Array & arr) {
     switch( operand->type ) {
         case handlebars_operand_type_null:
-        	arr.append(Variant());
+            arr.append(Variant());
             break;
         case handlebars_operand_type_boolean:
-        	arr.append((bool) operand->data.boolval);
+            arr.append((bool) operand->data.boolval);
             break;
         case handlebars_operand_type_long:
-        	arr.append((int64_t) operand->data.longval);
+            arr.append((int64_t) operand->data.longval);
             break;
         case handlebars_operand_type_string:
-        	arr.append(String(operand->data.stringval));
+            arr.append(String(operand->data.stringval));
             break;
         case handlebars_operand_type_array: {
-        	Array current;
+            Array current;
             char ** tmp = operand->data.arrayval;
             for( ; *tmp; ++tmp ) {
-            	current.append(String(*tmp));
+                current.append(String(*tmp));
             }
             arr.append(current);
             break;
@@ -97,30 +97,34 @@ static void hhvm_handlebars_operand_array_append(struct handlebars_operand * ope
 }
 
 static Array hhvm_handlebars_opcode_to_array(struct handlebars_opcode * opcode) {
-	Array current;
-	Array args;
+    Array current;
+    Array args;
     const char * name = handlebars_opcode_readable_type(opcode->type);
     short num = handlebars_opcode_num_operands(opcode->type);
 
-    current.add(String("name"), String(name));
+    current.add(String("opcode"), String(name));
+
+    // cough
+    args.append(0);
+    args.pop();
 
     if( num >= 1 ) {
-    	hhvm_handlebars_operand_array_append(&opcode->op1, args);
+        hhvm_handlebars_operand_array_append(&opcode->op1, args);
     }
     if( num >= 2 ) {
-    	hhvm_handlebars_operand_array_append(&opcode->op2, args);
+        hhvm_handlebars_operand_array_append(&opcode->op2, args);
     }
     if( num >= 3 ) {
-    	hhvm_handlebars_operand_array_append(&opcode->op3, args);
+        hhvm_handlebars_operand_array_append(&opcode->op3, args);
     }
 
     current.add(String("args"), args);
 
-	return current;
+    return current;
 }
 
 static Array hhvm_handlebars_opcodes_to_array(struct handlebars_opcode ** opcodes, size_t count) {
-	Array current;
+    Array current;
     size_t i;
     struct handlebars_opcode ** pos = opcodes;
 
@@ -137,13 +141,17 @@ static Array hhvm_handlebars_compiler_to_array(struct handlebars_compiler * comp
     Array children;
     size_t i;
 
+    // cough
+    children.append(0);
+    children.pop();
+
     // Opcodes
     current.add(String("opcodes"), hhvm_handlebars_opcodes_to_array(compiler->opcodes, compiler->opcodes_length));
 
     // Children
     for( i = 0; i < compiler->children_length; i++ ) {
-    	struct handlebars_compiler * child = *(compiler->children + i);
-    	children.append(hhvm_handlebars_compiler_to_array(child));
+        struct handlebars_compiler * child = *(compiler->children + i);
+        children.append(hhvm_handlebars_compiler_to_array(child));
     }
 
     current.add(String("children"), children);
@@ -153,7 +161,7 @@ static Array hhvm_handlebars_compiler_to_array(struct handlebars_compiler * comp
 }
 
 static Array hhvm_handlebars_ast_list_to_array(struct handlebars_ast_list * list) {
-	Array current;
+    Array current;
 
     struct handlebars_ast_list_item * item;
     struct handlebars_ast_list_item * tmp;
@@ -163,38 +171,38 @@ static Array hhvm_handlebars_ast_list_to_array(struct handlebars_ast_list * list
     }
 
     handlebars_ast_list_foreach(list, item, tmp) {
-    	current.append(hhvm_handlebars_ast_node_to_array(item->data));
+        current.append(hhvm_handlebars_ast_node_to_array(item->data));
     }
 
     return current;
 }
 
 static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node) {
-	Array current;
+    Array current;
 
-	if( node == NULL ) {
-		return current;
-	}
+    if( node == NULL ) {
+        return current;
+    }
 
-	current.add(String("type"), HPHP::String::FromCStr(handlebars_ast_node_readable_type(node->type)));
+    current.add(String("type"), HPHP::String::FromCStr(handlebars_ast_node_readable_type(node->type)));
 
-	if( node->strip > 0 ) {
-		Array strip;
-		strip.add(String("left"), (bool) (node->strip & handlebars_ast_strip_flag_left));
-		strip.add(String("right"), (bool) (node->strip & handlebars_ast_strip_flag_right));
-		strip.add(String("openStandalone"), (bool) (node->strip & handlebars_ast_strip_flag_open_standalone));
-		strip.add(String("closeStandalone"), (bool) (node->strip & handlebars_ast_strip_flag_close_standalone));
-		strip.add(String("inlineStandalone"), (bool) (node->strip & handlebars_ast_strip_flag_inline_standalone));
-		strip.add(String("leftStripped"), (bool) (node->strip & handlebars_ast_strip_flag_left_stripped));
-		strip.add(String("rightStriped"), (bool) (node->strip & handlebars_ast_strip_flag_right_stripped));
-		current.add(String("strip"), strip);
-	}
+    if( node->strip > 0 ) {
+        Array strip;
+        strip.add(String("left"), (bool) (node->strip & handlebars_ast_strip_flag_left));
+        strip.add(String("right"), (bool) (node->strip & handlebars_ast_strip_flag_right));
+        strip.add(String("openStandalone"), (bool) (node->strip & handlebars_ast_strip_flag_open_standalone));
+        strip.add(String("closeStandalone"), (bool) (node->strip & handlebars_ast_strip_flag_close_standalone));
+        strip.add(String("inlineStandalone"), (bool) (node->strip & handlebars_ast_strip_flag_inline_standalone));
+        strip.add(String("leftStripped"), (bool) (node->strip & handlebars_ast_strip_flag_left_stripped));
+        strip.add(String("rightStriped"), (bool) (node->strip & handlebars_ast_strip_flag_right_stripped));
+        current.add(String("strip"), strip);
+    }
 
 
     switch( node->type ) {
         case HANDLEBARS_AST_NODE_PROGRAM: {
             if( node->node.program.statements ) {
-            	current.add(String("statements"),
+                current.add(String("statements"),
                         hhvm_handlebars_ast_list_to_array(node->node.program.statements));
             }
             break;
@@ -246,7 +254,7 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
                         hhvm_handlebars_ast_node_to_array(node->node.raw_block.program));
             }
             if( node->node.raw_block.close ) {
-            	current.add(String("close"), String(node->node.raw_block.close));
+                current.add(String("close"), String(node->node.raw_block.close));
             }
             break;
         }
@@ -272,11 +280,11 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
         }
         case HANDLEBARS_AST_NODE_CONTENT: {
             if( node->node.content.string ) {
-            	current.add(String("string"),
+                current.add(String("string"),
                     String(node->node.content.string));
             }
             if( node->node.content.original ) {
-            	current.add(String("original"),
+                current.add(String("original"),
                     String(node->node.content.original));
             }
             break;
@@ -290,7 +298,7 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
         }
         case HANDLEBARS_AST_NODE_HASH_SEGMENT: {
             if( node->node.hash_segment.key ) {
-            	current.add(String("key"),
+                current.add(String("key"),
                     String(node->node.hash_segment.key));
             }
             if( node->node.hash_segment.value ) {
@@ -308,15 +316,15 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
             current.add(String("is_simple"), (int64_t) node->node.id.is_simple);
             current.add(String("is_scoped"), (int64_t) node->node.id.is_scoped);
             if( node->node.id.id_name ) {
-            	current.add(String("id_name"),
+                current.add(String("id_name"),
                     String(node->node.id.id_name));
             }
             if( node->node.id.string ) {
-            	current.add(String("string"),
+                current.add(String("string"),
                     String(node->node.id.string));
             }
             if( node->node.id.original ) {
-            	current.add(String("original"),
+                current.add(String("original"),
                     String(node->node.id.original));
             }
             break;
@@ -337,65 +345,65 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
         }
         case HANDLEBARS_AST_NODE_STRING: {
             if( node->node.string.string ) {
-            	current.add(String("string"),
+                current.add(String("string"),
                     String(node->node.string.string));
             }
             break;
         }
         case HANDLEBARS_AST_NODE_NUMBER: {
             if( node->node.number.string ) {
-            	current.add(String("number"),
+                current.add(String("number"),
                     String(node->node.number.string));
             }
             break;
         }
         case HANDLEBARS_AST_NODE_BOOLEAN: {
             if( node->node.boolean.string ) {
-            	current.add(String("boolean"),
+                current.add(String("boolean"),
                     String(node->node.boolean.string));
             }
             break;
         }
         case HANDLEBARS_AST_NODE_COMMENT: {
             if( node->node.comment.comment ) {
-            	current.add(String("comment"),
+                current.add(String("comment"),
                     String(node->node.comment.comment));
             }
             break;
         }
         case HANDLEBARS_AST_NODE_PATH_SEGMENT: {
             if( node->node.path_segment.separator ) {
-            	current.add(String("separator"),
+                current.add(String("separator"),
                     String(node->node.path_segment.separator));
             }
             if( node->node.path_segment.part ) {
-            	current.add(String("part"),
+                current.add(String("part"),
                     String(node->node.path_segment.part));
             }
             break;
         }
 
         case HANDLEBARS_AST_NODE_INVERSE_AND_PROGRAM:
-        	break;
+            break;
         case HANDLEBARS_AST_NODE_NIL:
             break;
     }
 
-	return current;
+    return current;
 }
 
 
 Variant HHVM_FUNCTION(handlebars_error) {
-	Variant ret;
-	if( handlebars_last_error.length() ) {
-		ret = HPHP::String::FromCStr(handlebars_last_error.c_str());
-	}
-	return ret;
+    Variant ret;
+    if( handlebars_last_error.length() ) {
+        ret = HPHP::String::FromCStr(handlebars_last_error.c_str());
+    }
+    return ret;
 }
 
 Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-	const char * tmplc = tmpl.toCppString().c_str();
+    const char * tmplc = tmpl.toCppString().c_str();
 
     ctx->tmpl = (char *) tmplc;
     struct handlebars_token_list * list = handlebars_lex(ctx);
@@ -404,11 +412,11 @@ Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
     struct handlebars_token_list_item * el = NULL;
     struct handlebars_token_list_item * tmp = NULL;
     handlebars_token_list_foreach(list, el, tmp) {
-    	struct handlebars_token * token = el->data;
-    	Array child;
-    	child.add(String("name"), HPHP::String::FromCStr(handlebars_token_readable_type(token->token)));
-    	child.add(String("text"), HPHP::String::FromCStr(token->text));
-    	ret.append(child);
+        struct handlebars_token * token = el->data;
+        Array child;
+        child.add(String("name"), HPHP::String::FromCStr(handlebars_token_readable_type(token->token)));
+        child.add(String("text"), HPHP::String::FromCStr(token->text));
+        ret.append(child);
     }
 
     handlebars_context_dtor(ctx);
@@ -418,7 +426,7 @@ Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
 
 String HHVM_FUNCTION(handlebars_lex_print, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-	const char * tmplc = tmpl.toCppString().c_str();
+    const char * tmplc = tmpl.toCppString().c_str();
 
     ctx->tmpl = (char *) tmplc;
 
@@ -434,17 +442,17 @@ String HHVM_FUNCTION(handlebars_lex_print, const String& tmpl) {
 
 Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-	const char * tmplc = tmpl.toCppString().c_str();
+    const char * tmplc = tmpl.toCppString().c_str();
     Variant ret;
 
     ctx->tmpl = (char *) tmplc;
     handlebars_yy_parse(ctx);
 
     if( ctx->error != NULL ) {
-    	ret = false;
-    	handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
+        ret = false;
+        handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
     } else {
-    	ret = hhvm_handlebars_ast_node_to_array(ctx->program);
+        ret = hhvm_handlebars_ast_node_to_array(ctx->program);
     }
 
     handlebars_context_dtor(ctx);
@@ -454,17 +462,17 @@ Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
 
 Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-	const char * tmplc = tmpl.toCppString().c_str();
+    const char * tmplc = tmpl.toCppString().c_str();
     Variant ret;
 
     ctx->tmpl = (char *) tmplc;
     handlebars_yy_parse(ctx);
 
     if( ctx->error != NULL ) {
-    	ret = false;
-    	handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
+        ret = false;
+        handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
     } else {
-    	char * output = handlebars_ast_print(ctx->program, 0);
+        char * output = handlebars_ast_print(ctx->program, 0);
         ret = HPHP::String::FromCStr(output);
     }
 
@@ -476,80 +484,80 @@ Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
 Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
-	const char * tmplc = tmpl.toCppString().c_str();
+    const char * tmplc = tmpl.toCppString().c_str();
     Variant ret;
 
     handlebars_compiler_set_flags(compiler, flags);
 
     char ** known_helpers_arr = hhvm_handlebars_known_helpers_from_variant(ctx, knownHelpers);
     if( known_helpers_arr ) {
-		compiler->known_helpers = (const char **) known_helpers_arr;
-	}
+        compiler->known_helpers = (const char **) known_helpers_arr;
+    }
 
     // Parse
     ctx->tmpl = (char *) tmplc;
     handlebars_yy_parse(ctx);
 
     if( ctx->error != NULL ) {
-    	ret = false;
-    	handlebars_last_error.assign(ctx->error);
-    	goto error;
+        ret = false;
+        handlebars_last_error.assign(ctx->error);
+        goto error;
     }
 
-	handlebars_compiler_compile(compiler, ctx->program);
-	if( compiler->errnum ) {
-		ret = false;
-		if( compiler->error ) {
-	    	handlebars_last_error.assign(ctx->error);
-		}
-		goto error;
-	}
+    handlebars_compiler_compile(compiler, ctx->program);
+    if( compiler->errnum ) {
+        ret = false;
+        if( compiler->error ) {
+            handlebars_last_error.assign(ctx->error);
+        }
+        goto error;
+    }
 
-	ret = hhvm_handlebars_compiler_to_array(compiler);
+    ret = hhvm_handlebars_compiler_to_array(compiler);
 
 error:
-	handlebars_context_dtor(ctx);
+    handlebars_context_dtor(ctx);
     return ret;
 }
 
 Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
-	struct handlebars_opcode_printer * printer = handlebars_opcode_printer_ctor(ctx);
-	const char * tmplc = tmpl.toCppString().c_str();
+    struct handlebars_opcode_printer * printer = handlebars_opcode_printer_ctor(ctx);
+    const char * tmplc = tmpl.toCppString().c_str();
     Variant ret;
 
     handlebars_compiler_set_flags(compiler, flags);
 
     char ** known_helpers_arr = hhvm_handlebars_known_helpers_from_variant(ctx, knownHelpers);
     if( known_helpers_arr ) {
-		compiler->known_helpers = (const char **) known_helpers_arr;
-	}
+        compiler->known_helpers = (const char **) known_helpers_arr;
+    }
 
     // Parse
     ctx->tmpl = (char *) tmplc;
     handlebars_yy_parse(ctx);
 
     if( ctx->error != NULL ) {
-    	ret = false;
-    	handlebars_last_error.assign(ctx->error);
-    	goto error;
+        ret = false;
+        handlebars_last_error.assign(ctx->error);
+        goto error;
     }
 
-	handlebars_compiler_compile(compiler, ctx->program);
-	if( compiler->errnum ) {
-		ret = false;
-		if( compiler->error ) {
-	    	handlebars_last_error.assign(ctx->error);
-		}
-		goto error;
-	}
+    handlebars_compiler_compile(compiler, ctx->program);
+    if( compiler->errnum ) {
+        ret = false;
+        if( compiler->error ) {
+            handlebars_last_error.assign(ctx->error);
+        }
+        goto error;
+    }
 
-	handlebars_opcode_printer_print(printer, compiler);
-	ret = HPHP::String::FromCStr(printer->output);
+    handlebars_opcode_printer_print(printer, compiler);
+    ret = HPHP::String::FromCStr(printer->output);
 
 error:
-	handlebars_context_dtor(ctx);
+    handlebars_context_dtor(ctx);
     return ret;
 }
 
@@ -557,19 +565,19 @@ error:
 
 namespace {
 static class HandlebarsExtension : public Extension {
-	public:
-	HandlebarsExtension() : Extension("handlebars") {}
+    public:
+    HandlebarsExtension() : Extension("handlebars") {}
 
-	virtual void moduleInit() {
-		HHVM_FE(handlebars_error);
-		HHVM_FE(handlebars_lex);
-		HHVM_FE(handlebars_lex_print);
-		HHVM_FE(handlebars_parse);
-		HHVM_FE(handlebars_parse_print);
-		HHVM_FE(handlebars_compile);
-		HHVM_FE(handlebars_compile_print);
-		loadSystemlib();
-	}
+    virtual void moduleInit() {
+        HHVM_FE(handlebars_error);
+        HHVM_FE(handlebars_lex);
+        HHVM_FE(handlebars_lex_print);
+        HHVM_FE(handlebars_parse);
+        HHVM_FE(handlebars_parse_print);
+        HHVM_FE(handlebars_compile);
+        HHVM_FE(handlebars_compile_print);
+        loadSystemlib();
+    }
 } s_handlebars_extension;
 }
 

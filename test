@@ -8,5 +8,5 @@ fi
 
 hhvm \
   -vDynamicExtensions.0=${DIRNAME}/handlebars.so \
-  `which phpunit` ${DIRNAME}/test
+  `which phpunit` --stop-on-failure ${DIRNAME}/tests
 
