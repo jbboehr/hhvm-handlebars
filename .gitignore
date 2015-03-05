@@ -1,0 +1,7 @@
+.cproject
+.project
+.settings
+/CMake*
+/cmake_install.cmake
+/handlebars.so
+/Makefile
