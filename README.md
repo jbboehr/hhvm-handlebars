@@ -3,7 +3,7 @@
 
 [![Build Status](https://travis-ci.org/jbboehr/hhvm-handlebars.svg?branch=master)](https://travis-ci.org/jbboehr/hhvm-handlebars)
 
-PHP bindings for the handlebars.c lexer, parser, and compiler. Use with [handlebars.c](https://github.com/jbboehr/handlebars.c) and [handlebars.php](https://github.com/jbboehr/handlebars.php).
+HHVM bindings for the handlebars.c lexer, parser, and compiler. Use with [handlebars.c](https://github.com/jbboehr/handlebars.c) and [handlebars.php](https://github.com/jbboehr/handlebars.php).
 
 
 ## Installation
