@@ -36,6 +36,7 @@ namespace HPHP {
 
 namespace {
 
+static const char * HANDLEBARS_VERSION = "0.2.0";
 static std::string handlebars_last_error;
 static const int64_t HANDLEBARS_COMPILER_FLAG_NONE = handlebars_compiler_flag_none;
 static const int64_t HANDLEBARS_COMPILER_FLAG_USE_DEPTHS = handlebars_compiler_flag_use_depths;
@@ -573,12 +574,16 @@ error:
     return ret;
 }
 
+String HHVM_FUNCTION(handlebars_version) {
+    return String(handlebars_version_string());
+}
+
 }
 
 namespace {
 static class HandlebarsExtension : public Extension {
     public:
-    HandlebarsExtension() : Extension("handlebars") {}
+    HandlebarsExtension() : Extension("handlebars", HANDLEBARS_VERSION) {}
 
     virtual void moduleInit() {
 #ifndef ECLIPSE
@@ -598,6 +603,7 @@ static class HandlebarsExtension : public Extension {
         HHVM_FE(handlebars_parse_print);
         HHVM_FE(handlebars_compile);
         HHVM_FE(handlebars_compile_print);
+        HHVM_FE(handlebars_version);
         loadSystemlib();
     }
 } s_handlebars_extension;

@@ -2,6 +2,7 @@
 .cproject
 .project
 .settings
+install_manifest.txt
 run-test
 /CMake*
 /cmake_install.cmake
