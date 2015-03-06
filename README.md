@@ -25,6 +25,11 @@ make
 sudo make install
 ```
 
+To enable, add this to your HHVM config:
+```
+hhvm.dynamic_extension_path = /path/to/hhvm/extensions
+hhvm.dynamic_extensions[handlebars] = handlebars.so
+```
 
 ## License
 
