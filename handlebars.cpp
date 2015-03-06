@@ -10,22 +10,22 @@
 #include "hphp/runtime/ext/ext_closure.h"
 #include "hphp/runtime/base/base-includes.h"
 
+extern "C" {
 #include "handlebars.h"
 #include "handlebars_ast.h"
 #include "handlebars_ast_list.h"
 #include "handlebars_ast_printer.h"
 #include "handlebars_compiler.h"
 #include "handlebars_context.h"
+#include "handlebars_memory.h"
 #include "handlebars_opcodes.h"
 #include "handlebars_opcode_printer.h"
 #include "handlebars_token.h"
 #include "handlebars_token_list.h"
 #include "handlebars_token_printer.h"
-
-extern "C" {
-    #include "handlebars.tab.h"
-    #include "handlebars.lex.h"
-    int handlebars_yy_parse (struct handlebars_context * context);
+#include "handlebars.tab.h"
+#include "handlebars.lex.h"
+int handlebars_yy_parse (struct handlebars_context * context);
 }
 
 #define HBS_STR(x) #x
@@ -62,19 +62,19 @@ static char ** hhvm_handlebars_known_helpers_from_variant(struct handlebars_cont
     // Allocate array
     char ** ptr;
     char ** known_helpers;
-    ptr = known_helpers = talloc_array(ctx, char *, count + 1);
+    ptr = known_helpers = handlebars_talloc_array(ctx, char *, count + 1);
 
     // Copy in known helpers
     for (ArrayIter iter(knownHelpersArray); iter; ++iter) {
           const Variant& value(iter.secondRefPlus());
           if( value.isString() ) {
-              *ptr++ = (char *) talloc_strdup(ctx, value.toCStrRef().toCppString().c_str());
+              *ptr++ = (char *) handlebars_talloc_strdup(ctx, value.toCStrRef().toCppString().c_str());
           }
     }
 
     // Copy in builtins
     for( const char ** ptr2 = handlebars_builtins; *ptr2; ++ptr2 ) {
-        *ptr++ = (char *) talloc_strdup(ctx, *ptr2);
+        *ptr++ = (char *) handlebars_talloc_strdup(ctx, *ptr2);
     }
 
     // Null terminate
@@ -416,9 +416,8 @@ Variant HHVM_FUNCTION(handlebars_error) {
 
 Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-    const char * tmplc = tmpl.toCppString().c_str();
+    ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
-    ctx->tmpl = (char *) tmplc;
     struct handlebars_token_list * list = handlebars_lex(ctx);
 
     Array ret;
@@ -439,9 +438,7 @@ Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
 
 String HHVM_FUNCTION(handlebars_lex_print, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-    const char * tmplc = tmpl.toCppString().c_str();
-
-    ctx->tmpl = (char *) tmplc;
+    ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
     struct handlebars_token_list * list = handlebars_lex(ctx);
     char * output = handlebars_token_list_print(list, 0);
@@ -455,12 +452,11 @@ String HHVM_FUNCTION(handlebars_lex_print, const String& tmpl) {
 
 Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-    const char * tmplc = tmpl.toCppString().c_str();
-    Variant ret;
+    ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
-    ctx->tmpl = (char *) tmplc;
     handlebars_yy_parse(ctx);
 
+    Variant ret;
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
@@ -475,12 +471,10 @@ Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
 
 Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
-    const char * tmplc = tmpl.toCppString().c_str();
-    Variant ret;
-
-    ctx->tmpl = (char *) tmplc;
+    ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
     handlebars_yy_parse(ctx);
 
+    Variant ret;
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
@@ -497,8 +491,7 @@ Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
 Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
-    const char * tmplc = tmpl.toCppString().c_str();
-    Variant ret;
+    ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
     handlebars_compiler_set_flags(compiler, flags);
 
@@ -508,9 +501,9 @@ Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, con
     }
 
     // Parse
-    ctx->tmpl = (char *) tmplc;
     handlebars_yy_parse(ctx);
 
+    Variant ret;
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(ctx->error);
@@ -537,8 +530,7 @@ Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flag
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
     struct handlebars_opcode_printer * printer = handlebars_opcode_printer_ctor(ctx);
-    const char * tmplc = tmpl.toCppString().c_str();
-    Variant ret;
+    ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
     handlebars_compiler_set_flags(compiler, flags);
 
@@ -548,9 +540,9 @@ Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flag
     }
 
     // Parse
-    ctx->tmpl = (char *) tmplc;
     handlebars_yy_parse(ctx);
 
+    Variant ret;
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(ctx->error);
