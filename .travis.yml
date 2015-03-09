@@ -12,19 +12,17 @@ before_install:
   - sudo apt-add-repository -y ppa:mandel/movie-tracker
   - sudo apt-get update -qq
   - sudo apt-get install -qq libhandlebars-dev libtalloc-dev hhvm hhvm-dev g++-4.8 gcc-4.8 libboost1.49-dev libgoogle-glog-dev libjemalloc-dev
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 20
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 20
-  - sudo update-alternatives --config gcc
-  - sudo update-alternatives --config g++
-  - export CXX=`which g++-4.8`
-  - export CC=`which gcc-4.8`
-
-script:
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 90
   - hphpize
   - cmake .
   - make
+  - sudo make install
+  - 'sudo echo "hhvm.dynamic_extension_path=`pwd`" >> /etc/hhvm/php.ini'
+  - 'sudo echo "hhvm.dynamic_extensions[handlebars]=handlebars.so" >> /etc/hhvm/php.ini'
   - php generate-tests.php
-  - ./test
+
+script:
+  - phpunit ./tests
 
 branches:
   only:
