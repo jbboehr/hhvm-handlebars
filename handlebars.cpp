@@ -36,7 +36,7 @@ namespace HPHP {
 
 namespace {
 
-static const char * HANDLEBARS_VERSION = "0.2.0";
+static const char * HANDLEBARS_VERSION = "0.2.1";
 static std::string handlebars_last_error;
 static const int64_t HANDLEBARS_COMPILER_FLAG_NONE = handlebars_compiler_flag_none;
 static const int64_t HANDLEBARS_COMPILER_FLAG_USE_DEPTHS = handlebars_compiler_flag_use_depths;
