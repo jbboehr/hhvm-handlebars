@@ -117,7 +117,7 @@ static Array hhvm_handlebars_opcode_to_array(struct handlebars_opcode * opcode) 
 
     current.add(String("opcode"), String(name));
 
-    // cough
+    // coerce to array
     args.append(0);
     args.pop();
 
@@ -141,6 +141,10 @@ static Array hhvm_handlebars_opcodes_to_array(struct handlebars_opcode ** opcode
     size_t i;
     struct handlebars_opcode ** pos = opcodes;
 
+    // coerce to array
+    current.append(0);
+    current.pop();
+    
     for( i = 0; i < count; i++, pos++ ) {
         current.append(hhvm_handlebars_opcode_to_array(*pos));
     }
@@ -154,7 +158,7 @@ static Array hhvm_handlebars_compiler_to_array(struct handlebars_compiler * comp
     Array children;
     size_t i;
 
-    // cough
+    // coerce to array
     children.append(0);
     children.pop();
 
