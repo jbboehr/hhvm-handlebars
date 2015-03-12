@@ -17,6 +17,9 @@ Install [handlebars.c](https://github.com/jbboehr/handlebars.c)
 Note: For precise, see [.travis.yml](https://github.com/jbboehr/hhvm-handlebars/blob/master/.travis.yml)
 
 ```bash
+# HHVM dev dependencies
+sudo apt-get install libboost-dev libjemalloc-dev libgoogle-glog-dev libtbb-dev
+
 git clone https://github.com/jbboehr/hhvm-handlebars.git --recursive
 cd hhvm-handlebars
 hphpize
