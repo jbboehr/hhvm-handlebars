@@ -173,6 +173,25 @@ static Array hhvm_handlebars_compiler_to_array(struct handlebars_compiler * comp
 
     current.add(String("children"), children);
 
+    // Add depths
+    long depths = compiler->depths;
+    int depthi = 0;
+    Array zdepths;
+
+    // coerce to array
+    zdepths.append(0);
+    zdepths.pop();
+
+    while( depths > 0 ) {
+        if( depths & 1 ) {
+            zdepths.append(depthi);
+        }
+        depthi++;
+        depths = depths >> 1;
+    }
+
+    current.add(String("depths"), zdepths);
+
     // Return
     return current;
 }
