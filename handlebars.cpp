@@ -174,8 +174,8 @@ static Array hhvm_handlebars_compiler_to_array(struct handlebars_compiler * comp
     current.add(String("children"), children);
 
     // Add depths
-    long depths;
-    int depthi;
+    long depths = compiler->depths;
+    int depthi = 0;
     Array zdepths;
 
     // coerce to array
