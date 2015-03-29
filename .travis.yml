@@ -5,8 +5,6 @@ php:
 
 before_install:
 # thanks, rabbitmq
-  - ls /etc/apt/sources.list.d/ || true
-  - cat /etc/apt/sources.list || true
   - sudo rm -f /etc/apt/sources.list.d/*rabbit*
   - sudo apt-get update -qq
   - sudo apt-get install software-properties-common || sudo apt-get install python-software-properties || true
