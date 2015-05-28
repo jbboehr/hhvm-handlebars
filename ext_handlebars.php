@@ -103,25 +103,15 @@ class HandlebarsNative {
     static function version(): string;
 }
 
-namespace Handlebars {
+namespace Handlebars;
 
 use Exception as BaseException;
 
-const COMPILER_FLAG_NONE = 0;
-const COMPILER_FLAG_USE_DEPTHS = (1 << 0);
-const COMPILER_FLAG_STRING_PARAMS = (1 << 1);
-const COMPILER_FLAG_TRACK_IDS = (1 << 2);
-const COMPILER_FLAG_KNOWN_HELPERS_ONLY = (1 << 4);
-const COMPILER_FLAG_COMPAT = (1 << 0);
-const COMPILER_FLAG_ALL = (1 << 4) - 1;
-
-// @todo there's probably a way to do this right
+// @todo there's probably a way to do this
 class Native extends \HandlebarsNative {}
 class Exception extends BaseException {}
 class CompileException extends Exception {}
 class LexException extends Exception {}
 class ParseException extends Exception {}
 class RuntimeException extends Exception {}
-
-}
 

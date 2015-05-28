@@ -33,50 +33,30 @@ int handlebars_yy_parse (struct handlebars_context * context);
 
 #define HBS_STR(x) #x
 #define HBS_HHVM_CONST_INT(y, x) HPHP::Native::registerConstant<KindOfInt64>(StaticString(y).get(), x);
-#define HBS_DEFINE_CLASS(CLS, NAME) \
-  class CLS { \
-   public: \
-    static Object allocObject() { \
-      if (cls == nullptr) { \
-        initClass(); \
-      } \
-      return ObjectData::newInstance(cls); \
-    } \
-    \
-    static Object allocObject(const Variant& arg) { \
-      Object ret = allocObject(); \
-      TypedValue dummy; \
-      g_context->invokeFunc(&dummy, \
-                              cls->getCtor(), \
-                              make_packed_array(arg), \
-                              ret.get()); \
-      return ret; \
-    } \
-    \
-   private: \
-    static void initClass() { \
-      cls = Unit::lookupClass(StringData::Make(NAME)); \
-    } \
-    \
-    static HPHP::Class* cls; \
-  };
-
 
 namespace HPHP {
 
-namespace {
-
-static const char * HANDLEBARS_VERSION = "0.2.1";
+static const char * HANDLEBARS_VERSION = "0.3.0";
 static std::string handlebars_last_error;
-static const int64_t HANDLEBARS_COMPILER_FLAG_NONE = handlebars_compiler_flag_none;
-static const int64_t HANDLEBARS_COMPILER_FLAG_USE_DEPTHS = handlebars_compiler_flag_use_depths;
-static const int64_t HANDLEBARS_COMPILER_FLAG_STRING_PARAMS = handlebars_compiler_flag_string_params;
-static const int64_t HANDLEBARS_COMPILER_FLAG_TRACK_IDS = handlebars_compiler_flag_track_ids;
-static const int64_t HANDLEBARS_COMPILER_FLAG_KNOWN_HELPERS_ONLY = handlebars_compiler_flag_known_helpers_only;
-static const int64_t HANDLEBARS_COMPILER_FLAG_COMPAT = handlebars_compiler_flag_compat;
-static const int64_t HANDLEBARS_COMPILER_FLAG_ALL = handlebars_compiler_flag_all;
+static HPHP::Class * s_HandlebarsExceptionClass = nullptr;
+static HPHP::Class * s_HandlebarsCompileExceptionClass = nullptr;
+static HPHP::Class * s_HandlebarsLexExceptionClass = nullptr;
+static HPHP::Class * s_HandlebarsParseExceptionClass = nullptr;
 
 static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node);
+
+static ObjectData * AllocHandlebarsExceptionObject(Class * cls, const Variant& message) {
+  ObjectData* inst = ObjectData::newInstance(cls);
+  TypedValue ret;
+  {
+    /* Increment refcount across call to ctor, so the object doesn't */
+    /* get destroyed when ctor's frame is torn down */
+    CountableHelper cnt(inst);
+    g_context->invokeFunc(&ret, cls->getCtor(), make_packed_array(message), inst);
+  }
+  tvRefcountedDecRef(&ret);
+  return inst;
+}
 
 static char ** hhvm_handlebars_known_helpers_from_variant(struct handlebars_context * ctx, const Variant & knownHelpers) {
     if( !knownHelpers.isArray() ) {
@@ -458,8 +438,6 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
     return current;
 }
 
-
-
 /* {{{ proto string handlebars_error(void) */
 
 static inline Variant hhvm_handlebars_get_last_error() {
@@ -539,7 +517,7 @@ String HHVM_STATIC_METHOD(HandlebarsNative, lexPrint, const String& tmpl) {
 /* }}} handlebars_lex_print */
 /* {{{ proto mixed handlebars_parse(string tmpl) */
 
-static inline Variant hhvm_handlebars_parse(const String& tmpl) {
+static inline Variant hhvm_handlebars_parse(const String& tmpl, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
@@ -549,6 +527,9 @@ static inline Variant hhvm_handlebars_parse(const String& tmpl) {
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
+	    if( exceptions ) {
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsParseExceptionClass, handlebars_last_error));
+        }
     } else {
         ret = hhvm_handlebars_ast_node_to_array(ctx->program);
     }
@@ -559,17 +540,17 @@ static inline Variant hhvm_handlebars_parse(const String& tmpl) {
 }
 
 Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
-    return hhvm_handlebars_parse(tmpl);
+    return hhvm_handlebars_parse(tmpl, false);
 }
 
 Variant HHVM_STATIC_METHOD(HandlebarsNative, parse, const String& tmpl) {
-    return hhvm_handlebars_parse(tmpl);
+    return hhvm_handlebars_parse(tmpl, true);
 }
 
 /* }}} handlebars_parse */
 /* {{{ proto mixed handlebars_parse_print(string tmpl) */
 
-static inline Variant hhvm_handlebars_parse_print(const String& tmpl) {
+static inline Variant hhvm_handlebars_parse_print(const String& tmpl, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
     handlebars_yy_parse(ctx);
@@ -578,6 +559,9 @@ static inline Variant hhvm_handlebars_parse_print(const String& tmpl) {
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
+	    if( exceptions ) {
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsParseExceptionClass, handlebars_last_error));
+        }
     } else {
         char * output = handlebars_ast_print(ctx->program, 0);
         ret = HPHP::String::FromCStr(output);
@@ -589,17 +573,17 @@ static inline Variant hhvm_handlebars_parse_print(const String& tmpl) {
 }
 
 Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
-    return hhvm_handlebars_parse_print(tmpl);
+    return hhvm_handlebars_parse_print(tmpl, false);
 }
 
 Variant HHVM_STATIC_METHOD(HandlebarsNative, parsePrint, const String& tmpl) {
-    return hhvm_handlebars_parse_print(tmpl);
+    return hhvm_handlebars_parse_print(tmpl, true);
 }
 
 /* }}} handlebars_parse_print */
 /* {{{ proto mixed handlebars_compile(string tmpl[, long flags[, array knownHelpers]]) */
 
-static inline Variant hhvm_handlebars_compile(const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+static inline Variant hhvm_handlebars_compile(const String& tmpl, int64_t flags, const Variant& knownHelpers, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
@@ -618,6 +602,10 @@ static inline Variant hhvm_handlebars_compile(const String& tmpl, int64_t flags,
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(ctx->error);
+	    if( exceptions ) {
+            // @todo this should probably be a ParseException
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+        }
         goto error;
     }
 
@@ -626,6 +614,9 @@ static inline Variant hhvm_handlebars_compile(const String& tmpl, int64_t flags,
         ret = false;
         if( compiler->error ) {
             handlebars_last_error.assign(ctx->error);
+	        if( exceptions ) {
+                throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+            }
         }
         goto error;
     }
@@ -638,17 +629,17 @@ error:
 }
 
 Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
-    return hhvm_handlebars_compile(tmpl, flags, knownHelpers);
+    return hhvm_handlebars_compile(tmpl, flags, knownHelpers, false);
 }
 
 Variant HHVM_STATIC_METHOD(HandlebarsNative, compile, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
-    return hhvm_handlebars_compile(tmpl, flags, knownHelpers);
+    return hhvm_handlebars_compile(tmpl, flags, knownHelpers, true);
 }
 
 /* }}} handlebars_compile */
 /* {{{ proto mixed handlebars_compile_print(string tmpl[, long flags[, array knownHelpers]]) */
 
-static inline Variant hhvm_handlebars_compile_print(const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+static inline Variant hhvm_handlebars_compile_print(const String& tmpl, int64_t flags, const Variant& knownHelpers, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
     struct handlebars_opcode_printer * printer = handlebars_opcode_printer_ctor(ctx);
@@ -668,6 +659,10 @@ static inline Variant hhvm_handlebars_compile_print(const String& tmpl, int64_t 
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(ctx->error);
+	    if( exceptions ) {
+            // @todo this should probably be a ParseException
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+        }
         goto error;
     }
 
@@ -676,6 +671,9 @@ static inline Variant hhvm_handlebars_compile_print(const String& tmpl, int64_t 
         ret = false;
         if( compiler->error ) {
             handlebars_last_error.assign(ctx->error);
+	        if( exceptions ) {
+                throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+            }
         }
         goto error;
     }
@@ -689,11 +687,11 @@ error:
 }
 
 Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
-    return hhvm_handlebars_compile_print(tmpl, flags, knownHelpers);
+    return hhvm_handlebars_compile_print(tmpl, flags, knownHelpers, false);
 }
 
 Variant HHVM_STATIC_METHOD(HandlebarsNative, compilePrint, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
-    return hhvm_handlebars_compile_print(tmpl, flags, knownHelpers);
+    return hhvm_handlebars_compile_print(tmpl, flags, knownHelpers, true);
 }
 
 /* }}} handlebars_compile_print */
@@ -708,10 +706,6 @@ Variant HHVM_STATIC_METHOD(HandlebarsNative, version) {
 }
 
 /* }}} handlebars_version */
-
-}
-
-namespace {
 
 static class HandlebarsExtension : public Extension {
     public:
@@ -745,10 +739,14 @@ static class HandlebarsExtension : public Extension {
         HHVM_STATIC_ME(HandlebarsNative, version);
 
         loadSystemlib();
+
+    	s_HandlebarsExceptionClass = Unit::lookupClass(StaticString("Handlebars\\Exception").get());
+    	s_HandlebarsCompileExceptionClass = Unit::lookupClass(StaticString("Handlebars\\CompileException").get());
+    	s_HandlebarsLexExceptionClass = Unit::lookupClass(StaticString("Handlebars\\LexException").get());
+    	s_HandlebarsParseExceptionClass = Unit::lookupClass(StaticString("Handlebars\\ParseException").get());
     }
 } s_handlebars_extension;
-}
-
 
 HHVM_GET_MODULE(handlebars)
+
 }
