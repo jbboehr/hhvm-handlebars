@@ -148,9 +148,9 @@ function hbs_generate_export_test_body(array $test) {
     $output .= $i . '$compileFlags = ' . var_export($compileFlags, true) . ';' . PHP_EOL;
     $output .= $i . '$knownHelpers = ' . var_export($knownHelpers, true) . ';' . PHP_EOL;
     $output .= $i . '$expected = ' . var_export($expectedOpcodes, true) . ';' . PHP_EOL;
-    $output .= $i . '$actual = handlebars_compile($tmpl, $compileFlags, $knownHelpers);' . PHP_EOL;
+    $output .= $i . '$actual = Native::compile($tmpl, $compileFlags, $knownHelpers);' . PHP_EOL;
     $output .= $i . '$this->assertEquals($expected, $actual);' . PHP_EOL;
-    $output .= $i . '$this->assertEquals("string", gettype(handlebars_compile_print($tmpl, $compileFlags, $knownHelpers)));' . PHP_EOL;
+    $output .= $i . '$this->assertEquals("string", gettype(Native::compilePrint($tmpl, $compileFlags, $knownHelpers)));' . PHP_EOL;
     return $output;
 }
 
@@ -161,11 +161,11 @@ function hbs_generate_spec_test_body_tokenizer(array $test) {
     $output .= $i . '$tmpl = ' . var_export($test['template'], true) . ';' . PHP_EOL;
 
     $output .= $i . '$expected = ' . var_export($test['expected'], true) . ';' . PHP_EOL;
-    $output .= $i . '$actual = handlebars_lex($tmpl);' . PHP_EOL;
+    $output .= $i . '$actual = Native::lex($tmpl);' . PHP_EOL;
     $output .= $i . '$this->assertEquals($expected, $actual);' . PHP_EOL;
 
     $output .= $i . '$expected = ' . var_export(token_print($test['expected']), true) . ';' . PHP_EOL;
-    $output .= $i . '$actual = handlebars_lex_print($tmpl);' . PHP_EOL;
+    $output .= $i . '$actual = Native::lexPrint($tmpl);' . PHP_EOL;
     $output .= $i . '$this->assertEquals($expected, $actual);' . PHP_EOL;
 
     return $output;
@@ -181,11 +181,11 @@ function hbs_generate_spec_test_body_parser(array $test) {
     $i = '        ';
     $output = '';
     $output .= $i . '$tmpl = ' . var_export($test['template'], true) . ';' . PHP_EOL;
-    $output .= $i . '$actual = handlebars_parse_print($tmpl);' . PHP_EOL;
+    $output .= $i . '$actual = Native::parsePrint($tmpl);' . PHP_EOL;
     $output .= $i . '$expected = ' . var_export($expected, true) . ';' . PHP_EOL;
     $output .= $i . '$this->assertEquals($expected, $actual);' . PHP_EOL;
 
-    $output .= $i . '$actual = gettype(handlebars_parse($tmpl));' . PHP_EOL;
+    $output .= $i . '$actual = gettype(Native::parse($tmpl));' . PHP_EOL;
     if( empty($test['exception']) ) {
     	$output .= $i . '$expected = ' . var_export('array', true) . ';' . PHP_EOL;
     } else {
@@ -254,6 +254,7 @@ foreach( array($tokenizerSpecFile, $parserSpecFile) as $file ) {
     $number = 0;
 
     $output = '<?php' . PHP_EOL;
+    $output .= 'use Handlebars\\Native;' . PHP_EOL;
     $output .= 'class Spec' . ucfirst($suiteName) . 'Test extends PHPUnit_Framework_TestCase {' . PHP_EOL;
 
     foreach( $tests as $test ) {

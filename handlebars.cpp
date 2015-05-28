@@ -9,6 +9,9 @@
 #include "hphp/runtime/base/builtin-functions.h"
 #include "hphp/runtime/ext/ext_closure.h"
 #include "hphp/runtime/base/base-includes.h"
+#include "hphp/util/string-vsnprintf.h"
+#include "hphp/runtime/base/array-init.h"
+#include "hphp/runtime/base/execution-context.h"
 
 extern "C" {
 #include "handlebars.h"
@@ -29,24 +32,31 @@ int handlebars_yy_parse (struct handlebars_context * context);
 }
 
 #define HBS_STR(x) #x
-#define HBS_HHVM_CONST_INT(x) HPHP::Native::registerConstant<KindOfInt64>(StaticString(HBS_STR(x)).get(), x);
+#define HBS_HHVM_CONST_INT(y, x) HPHP::Native::registerConstant<KindOfInt64>(StaticString(y).get(), x);
 
 namespace HPHP {
 
-
-namespace {
-
-static const char * HANDLEBARS_VERSION = "0.2.1";
+static const char * HANDLEBARS_VERSION = "0.3.0";
 static std::string handlebars_last_error;
-static const int64_t HANDLEBARS_COMPILER_FLAG_NONE = handlebars_compiler_flag_none;
-static const int64_t HANDLEBARS_COMPILER_FLAG_USE_DEPTHS = handlebars_compiler_flag_use_depths;
-static const int64_t HANDLEBARS_COMPILER_FLAG_STRING_PARAMS = handlebars_compiler_flag_string_params;
-static const int64_t HANDLEBARS_COMPILER_FLAG_TRACK_IDS = handlebars_compiler_flag_track_ids;
-static const int64_t HANDLEBARS_COMPILER_FLAG_KNOWN_HELPERS_ONLY = handlebars_compiler_flag_known_helpers_only;
-static const int64_t HANDLEBARS_COMPILER_FLAG_COMPAT = handlebars_compiler_flag_compat;
-static const int64_t HANDLEBARS_COMPILER_FLAG_ALL = handlebars_compiler_flag_all;
+static HPHP::Class * s_HandlebarsExceptionClass = nullptr;
+static HPHP::Class * s_HandlebarsCompileExceptionClass = nullptr;
+static HPHP::Class * s_HandlebarsLexExceptionClass = nullptr;
+static HPHP::Class * s_HandlebarsParseExceptionClass = nullptr;
 
 static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node);
+
+static ObjectData * AllocHandlebarsExceptionObject(Class * cls, const Variant& message) {
+  ObjectData* inst = ObjectData::newInstance(cls);
+  TypedValue ret;
+  {
+    /* Increment refcount across call to ctor, so the object doesn't */
+    /* get destroyed when ctor's frame is torn down */
+    CountableHelper cnt(inst);
+    g_context->invokeFunc(&ret, cls->getCtor(), make_packed_array(message), inst);
+  }
+  tvRefcountedDecRef(&ret);
+  return inst;
+}
 
 static char ** hhvm_handlebars_known_helpers_from_variant(struct handlebars_context * ctx, const Variant & knownHelpers) {
     if( !knownHelpers.isArray() ) {
@@ -428,8 +438,9 @@ static Array hhvm_handlebars_ast_node_to_array(struct handlebars_ast_node * node
     return current;
 }
 
+/* {{{ proto string handlebars_error(void) */
 
-Variant HHVM_FUNCTION(handlebars_error) {
+static inline Variant hhvm_handlebars_get_last_error() {
     Variant ret;
     if( handlebars_last_error.length() ) {
         ret = HPHP::String::FromCStr(handlebars_last_error.c_str());
@@ -437,7 +448,18 @@ Variant HHVM_FUNCTION(handlebars_error) {
     return ret;
 }
 
-Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
+Variant HHVM_FUNCTION(handlebars_error) {
+    return hhvm_handlebars_get_last_error();
+}
+
+Variant HHVM_STATIC_METHOD(HandlebarsNative, getLastError) {
+    return hhvm_handlebars_get_last_error();
+}
+
+/* }}} handlebars_error */
+/* {{{ proto mixed handlebars_lex(string tmpl) */
+
+static inline Array hhvm_handlebars_lex(const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
@@ -459,7 +481,18 @@ Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
     return ret;
 }
 
-String HHVM_FUNCTION(handlebars_lex_print, const String& tmpl) {
+Array HHVM_FUNCTION(handlebars_lex, const String& tmpl) {
+    return hhvm_handlebars_lex(tmpl);
+}
+
+Array HHVM_STATIC_METHOD(HandlebarsNative, lex, const String& tmpl) {
+    return hhvm_handlebars_lex(tmpl);
+}
+
+/* }}} handlebars_lex */
+/* {{{ proto mixed handlebars_lex_print(string tmpl) */
+
+static inline String hhvm_handlebars_lex_print(const String& tmpl) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
@@ -473,7 +506,18 @@ String HHVM_FUNCTION(handlebars_lex_print, const String& tmpl) {
     return ret;
 }
 
-Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
+String HHVM_FUNCTION(handlebars_lex_print, const String& tmpl) {
+    return hhvm_handlebars_lex_print(tmpl);
+}
+
+String HHVM_STATIC_METHOD(HandlebarsNative, lexPrint, const String& tmpl) {
+    return hhvm_handlebars_lex_print(tmpl);
+}
+
+/* }}} handlebars_lex_print */
+/* {{{ proto mixed handlebars_parse(string tmpl) */
+
+static inline Variant hhvm_handlebars_parse(const String& tmpl, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
 
@@ -483,6 +527,9 @@ Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
+	    if( exceptions ) {
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsParseExceptionClass, handlebars_last_error));
+        }
     } else {
         ret = hhvm_handlebars_ast_node_to_array(ctx->program);
     }
@@ -492,7 +539,18 @@ Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
     return ret;
 }
 
-Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
+Variant HHVM_FUNCTION(handlebars_parse, const String& tmpl) {
+    return hhvm_handlebars_parse(tmpl, false);
+}
+
+Variant HHVM_STATIC_METHOD(HandlebarsNative, parse, const String& tmpl) {
+    return hhvm_handlebars_parse(tmpl, true);
+}
+
+/* }}} handlebars_parse */
+/* {{{ proto mixed handlebars_parse_print(string tmpl) */
+
+static inline Variant hhvm_handlebars_parse_print(const String& tmpl, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
     handlebars_yy_parse(ctx);
@@ -501,6 +559,9 @@ Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(handlebars_context_get_errmsg(ctx));
+	    if( exceptions ) {
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsParseExceptionClass, handlebars_last_error));
+        }
     } else {
         char * output = handlebars_ast_print(ctx->program, 0);
         ret = HPHP::String::FromCStr(output);
@@ -511,7 +572,18 @@ Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
     return ret;
 }
 
-Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+Variant HHVM_FUNCTION(handlebars_parse_print, const String& tmpl) {
+    return hhvm_handlebars_parse_print(tmpl, false);
+}
+
+Variant HHVM_STATIC_METHOD(HandlebarsNative, parsePrint, const String& tmpl) {
+    return hhvm_handlebars_parse_print(tmpl, true);
+}
+
+/* }}} handlebars_parse_print */
+/* {{{ proto mixed handlebars_compile(string tmpl[, long flags[, array knownHelpers]]) */
+
+static inline Variant hhvm_handlebars_compile(const String& tmpl, int64_t flags, const Variant& knownHelpers, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
     ctx->tmpl = handlebars_talloc_strdup(ctx, tmpl.toCppString().c_str());
@@ -530,6 +602,10 @@ Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, con
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(ctx->error);
+	    if( exceptions ) {
+            // @todo this should probably be a ParseException
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+        }
         goto error;
     }
 
@@ -538,6 +614,9 @@ Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, con
         ret = false;
         if( compiler->error ) {
             handlebars_last_error.assign(ctx->error);
+	        if( exceptions ) {
+                throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+            }
         }
         goto error;
     }
@@ -549,7 +628,18 @@ error:
     return ret;
 }
 
-Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+Variant HHVM_FUNCTION(handlebars_compile, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+    return hhvm_handlebars_compile(tmpl, flags, knownHelpers, false);
+}
+
+Variant HHVM_STATIC_METHOD(HandlebarsNative, compile, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+    return hhvm_handlebars_compile(tmpl, flags, knownHelpers, true);
+}
+
+/* }}} handlebars_compile */
+/* {{{ proto mixed handlebars_compile_print(string tmpl[, long flags[, array knownHelpers]]) */
+
+static inline Variant hhvm_handlebars_compile_print(const String& tmpl, int64_t flags, const Variant& knownHelpers, bool exceptions) {
     struct handlebars_context * ctx = handlebars_context_ctor();
     struct handlebars_compiler * compiler = handlebars_compiler_ctor(ctx);
     struct handlebars_opcode_printer * printer = handlebars_opcode_printer_ctor(ctx);
@@ -569,6 +659,10 @@ Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flag
     if( ctx->error != NULL ) {
         ret = false;
         handlebars_last_error.assign(ctx->error);
+	    if( exceptions ) {
+            // @todo this should probably be a ParseException
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+        }
         goto error;
     }
 
@@ -577,6 +671,9 @@ Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flag
         ret = false;
         if( compiler->error ) {
             handlebars_last_error.assign(ctx->error);
+	        if( exceptions ) {
+                throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+            }
         }
         goto error;
     }
@@ -589,27 +686,39 @@ error:
     return ret;
 }
 
+Variant HHVM_FUNCTION(handlebars_compile_print, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+    return hhvm_handlebars_compile_print(tmpl, flags, knownHelpers, false);
+}
+
+Variant HHVM_STATIC_METHOD(HandlebarsNative, compilePrint, const String& tmpl, int64_t flags, const Variant& knownHelpers) {
+    return hhvm_handlebars_compile_print(tmpl, flags, knownHelpers, true);
+}
+
+/* }}} handlebars_compile_print */
+/* {{{ proto mixed handlebars_version(void) */
+
 String HHVM_FUNCTION(handlebars_version) {
     return String(handlebars_version_string());
 }
 
+Variant HHVM_STATIC_METHOD(HandlebarsNative, version) {
+    return String(handlebars_version_string());
 }
 
-namespace {
+/* }}} handlebars_version */
+
 static class HandlebarsExtension : public Extension {
     public:
     HandlebarsExtension() : Extension("handlebars", HANDLEBARS_VERSION) {}
 
     virtual void moduleInit() {
-#ifndef ECLIPSE
-    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_NONE);
-    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_USE_DEPTHS);
-    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_STRING_PARAMS);
-    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_TRACK_IDS);
-    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_KNOWN_HELPERS_ONLY);
-    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_COMPAT);
-    	HBS_HHVM_CONST_INT(HANDLEBARS_COMPILER_FLAG_ALL);
-#endif
+    	HBS_HHVM_CONST_INT("Handlebars\\COMPILER_FLAG_NONE", handlebars_compiler_flag_none);
+    	HBS_HHVM_CONST_INT("Handlebars\\COMPILER_FLAG_USE_DEPTHS", handlebars_compiler_flag_use_depths);
+    	HBS_HHVM_CONST_INT("Handlebars\\COMPILER_FLAG_STRING_PARAMS", handlebars_compiler_flag_string_params);
+    	HBS_HHVM_CONST_INT("Handlebars\\COMPILER_FLAG_TRACK_IDS", handlebars_compiler_flag_track_ids);
+    	HBS_HHVM_CONST_INT("Handlebars\\COMPILER_FLAG_KNOWN_HELPERS_ONLY", handlebars_compiler_flag_known_helpers_only);
+    	HBS_HHVM_CONST_INT("Handlebars\\COMPILER_FLAG_COMPAT", handlebars_compiler_flag_compat);
+    	HBS_HHVM_CONST_INT("Handlebars\\COMPILER_FLAG_ALL", handlebars_compiler_flag_all);
 
         HHVM_FE(handlebars_error);
         HHVM_FE(handlebars_lex);
@@ -619,11 +728,25 @@ static class HandlebarsExtension : public Extension {
         HHVM_FE(handlebars_compile);
         HHVM_FE(handlebars_compile_print);
         HHVM_FE(handlebars_version);
+
+        HHVM_STATIC_ME(HandlebarsNative, getLastError);
+        HHVM_STATIC_ME(HandlebarsNative, lex);
+        HHVM_STATIC_ME(HandlebarsNative, lexPrint);
+        HHVM_STATIC_ME(HandlebarsNative, parse);
+        HHVM_STATIC_ME(HandlebarsNative, parsePrint);
+        HHVM_STATIC_ME(HandlebarsNative, compile);
+        HHVM_STATIC_ME(HandlebarsNative, compilePrint);
+        HHVM_STATIC_ME(HandlebarsNative, version);
+
         loadSystemlib();
+
+    	s_HandlebarsExceptionClass = Unit::lookupClass(StaticString("Handlebars\\Exception").get());
+    	s_HandlebarsCompileExceptionClass = Unit::lookupClass(StaticString("Handlebars\\CompileException").get());
+    	s_HandlebarsLexExceptionClass = Unit::lookupClass(StaticString("Handlebars\\LexException").get());
+    	s_HandlebarsParseExceptionClass = Unit::lookupClass(StaticString("Handlebars\\ParseException").get());
     }
 } s_handlebars_extension;
-}
-
 
 HHVM_GET_MODULE(handlebars)
+
 }
