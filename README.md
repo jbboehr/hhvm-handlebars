@@ -14,7 +14,7 @@ Install [handlebars.c](https://github.com/jbboehr/handlebars.c)
 
 #### Ubuntu
 
-Note: For precise, see [.travis.yml](https://github.com/jbboehr/hhvm-handlebars/blob/master/.travis.yml)
+Note: For precise, see [.travis.sh](https://github.com/jbboehr/hhvm-handlebars/blob/master/.travis.sh)
 
 ```bash
 # HHVM dev dependencies
@@ -37,5 +37,4 @@ hhvm.dynamic_extensions[handlebars] = handlebars.so
 ## License
 
 This project is licensed under the [LGPLv3](http://www.gnu.org/licenses/lgpl-3.0.txt).
-handlebars.js is licensed under the [MIT license](http://opensource.org/licenses/MIT).
 
