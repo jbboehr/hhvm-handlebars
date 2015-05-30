@@ -604,7 +604,7 @@ static inline Variant hhvm_handlebars_compile(const String& tmpl, int64_t flags,
         handlebars_last_error.assign(ctx->error);
 	    if( exceptions ) {
             // @todo this should probably be a ParseException
-            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsParseExceptionClass, handlebars_last_error));
         }
         goto error;
     }
@@ -661,7 +661,7 @@ static inline Variant hhvm_handlebars_compile_print(const String& tmpl, int64_t 
         handlebars_last_error.assign(ctx->error);
 	    if( exceptions ) {
             // @todo this should probably be a ParseException
-            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsCompileExceptionClass, handlebars_last_error));
+            throw Object(AllocHandlebarsExceptionObject(s_HandlebarsParseExceptionClass, handlebars_last_error));
         }
         goto error;
     }
