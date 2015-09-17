@@ -35,7 +35,7 @@ int handlebars_yy_parse (struct handlebars_context * context);
 
 namespace HPHP {
 
-static const char * HANDLEBARS_VERSION = "0.3.1";
+static const char * HANDLEBARS_VERSION = "0.3.2";
 static std::string handlebars_last_error;
 static HPHP::Class * s_HandlebarsExceptionClass = nullptr;
 static HPHP::Class * s_HandlebarsCompileExceptionClass = nullptr;
