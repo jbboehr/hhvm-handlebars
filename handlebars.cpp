@@ -8,7 +8,6 @@
 #include "hphp/runtime/base/variable-unserializer.h"
 #include "hphp/runtime/base/builtin-functions.h"
 #include "hphp/runtime/ext/ext_closure.h"
-#include "hphp/runtime/base/base-includes.h"
 #include "hphp/util/string-vsnprintf.h"
 #include "hphp/runtime/base/array-init.h"
 #include "hphp/runtime/base/execution-context.h"

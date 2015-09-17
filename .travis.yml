@@ -3,20 +3,26 @@ language: php
 php:
   - hhvm
 
+env: LIBHANDLEBARS_VERSION=0.2.6
+
 branches:
   only:
     - master
+    - travis-fix
 
 sudo: required
 
-before_install:
-  - travis_retry ./.travis.sh before_install
-
 install:
-  - travis_retry ./.travis.sh install
+  - ./.travis.sh apt
+  - ./.travis.sh install_check
+  - ./.travis.sh install_bison
+  - ./.travis.sh install_handlebars
+  - ./.travis.sh install_glog
+  - ./.travis.sh install_jemalloc
+  - ./.travis.sh install_hhvm_handlebars
 
 before_script:
-  - travis_retry ./.travis.sh before_script
+  - ./.travis.sh before_script
 
 script:
   - phpunit ./tests
